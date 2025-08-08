@@ -1,0 +1,8 @@
+{
+  "name": "cardmemorygame",
+  "version": "1.0.0",
+  "description": "Memory game with player vs bot",
+  "scripts": {
+    "test": "echo \"No tests specified\" && exit 0"
+  }
+}
