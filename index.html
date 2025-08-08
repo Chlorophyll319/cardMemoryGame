@@ -237,6 +237,7 @@
           if (game_end || $(this).hasClass("show_back")) return;
           const type = Number($(this).data("type"));
           $(this).addClass("show_back");
+          $(this).data("owner", "player");
 
           // 翻 → 對 → 正確紀錄+1
           if (type === player_target && !$(this).data("hit")) {
@@ -293,10 +294,11 @@
               // 檢查記憶牌庫
               const candidate = bot_memory[bot_idx++];
               if (
-                // 還沒翻過 && 記憶中的目標牌
+                // 還沒翻過 && 記憶中的目標牌 && 不是玩家翻過的
                 !candidate.element.hasClass("show_back") &&
                 candidate.memory_type === bot_target &&
-                !candidate.has_tried
+                !candidate.has_tried &&
+                candidate.element.data("owner") !== "player"
               ) {
                 // 翻這張
                 card = candidate;
@@ -307,7 +309,10 @@
             // 如果記憶中都找不到，亂猜一張還沒翻的
             if (!card) {
               const unknown_cards = bot_memory.filter(
-                (m) => !m.element.hasClass("show_back") && !m.has_tried
+                (m) =>
+                  !m.element.hasClass("show_back") &&
+                  !m.has_tried &&
+                  m.element.data("owner") !== "player"
               );
 
               card = unknown_cards.length
@@ -323,7 +328,11 @@
           // 翻開這張牌
           card.element.addClass("show_back");
           // 如果翻對了
-          if (card.true_type === bot_target && !card.element.data("hit")) {
+          if (
+            card.true_type === bot_target &&
+            !card.element.data("hit") &&
+            card.element.data("owner") !== "player"
+          ) {
             // 修正記憶
             // 分數+1
             // 翻到三張機器人獲勝（結束遊戲）
