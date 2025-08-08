@@ -72,6 +72,9 @@
       .playboter {
         outline: tan solid 4px;
       }
+      .bot-flip {
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+      }
     </style>
   </head>
   <body>
@@ -93,16 +96,13 @@
       //  5. 玩家翻正確張數
       //  6. 計時開始時間
       //  7. 是否遊戲結束
-      //  8. 機器人下次要翻的指定目標
-      const card_types = [0, 1, 2, 3, 4, 5];
+        const card_types = [0, 1, 2, 3, 4, 5];
       const cards = [];
       let player_target = null;
       let bot_target = null;
       let player_hit = 0;
       let start_time = null;
       let game_end = false;
-      let bot_next_target = null;
-
       // ------工具：洗牌（打亂陣列）------
       /*
       生一個隨機整數 x （0~i）
@@ -255,15 +255,16 @@
           // 翻 → 對 → 正確紀錄+1
           if (type === player_target && !$(this).data("hit")) {
             player_hit++;
-            $(this).data("hit", true);
+            $(this).data("hit", true).data("owner", "player");
 
             // 翻對三張就贏了
             if (player_hit === 3) {
               end_game("player");
             }
           } else if (type === bot_target && !$(this).data("hit")) {
-            // 玩家翻到機器人目標 → 阻止機器人使用
-            $(this).data("hit", true);
+            // 玩家翻到機器人目標 → 阻止機器人使用並蓋回去
+            $(this).data("hit", true).data("owner", "player");
+            setTimeout(() => $(this).removeClass("show_back"), 800);
           } else {
             // 翻 → 錯 → 蓋回去
             setTimeout(() => $(this).removeClass("show_back"), 800);
@@ -274,10 +275,6 @@
             if (m.element.is(this)) {
               m.memory_type = m.true_type;
               m.has_tried = true;
-
-              if (m.true_type === bot_target && !$(this).data("hit")) {
-                bot_next_target = m;
-              }
             }
           });
         });
@@ -298,69 +295,60 @@
 
           // 抓現在要翻的那張牌
           let card;
-          // 如果上一輪有記下指定的牌就優先翻
-          if (bot_next_target) {
-            card = bot_next_target;
-            // 清除目標
-            bot_next_target = null;
-          } else {
-            // 如果沒有上一輪的目標，從記憶中找一張：
-            // 1. 還沒被翻開（避免重複翻）
-            // 2. 記憶中它是目標牌（記憶type === bot要找的目標type）
-            while (bot_idx < bot_memory.length) {
-              // 檢查記憶牌庫
-              const candidate = bot_memory[bot_idx++];
-              if (
-                // 還沒翻過 && 記憶中的目標牌
-                !candidate.element.hasClass("show_back") &&
-                candidate.memory_type === bot_target &&
-                !candidate.has_tried
-              ) {
-                // 翻這張
-                card = candidate;
-                // 找到就跳出
-                break;
-              }
-            }
-            // 如果記憶中都找不到，亂猜一張還沒翻的
-            if (!card) {
-              const unknown_cards = bot_memory.filter(
-                (m) => !m.element.hasClass("show_back") && !m.has_tried
-              );
 
-              card = unknown_cards.length
-                ? unknown_cards[
-                    Math.floor(Math.random() * unknown_cards.length)
-                  ]
-                : null;
+          // 從記憶中找一張：
+          // 1. 還沒被翻開（避免重複翻）
+          // 2. 記憶中它是目標牌（記憶type === bot要找的目標type）
+          // 3. 沒被玩家翻走
+          while (bot_idx < bot_memory.length) {
+            // 檢查記憶牌庫
+            const candidate = bot_memory[bot_idx++];
+            if (
+              !candidate.element.hasClass("show_back") &&
+              candidate.memory_type === bot_target &&
+              !candidate.has_tried &&
+              candidate.element.data("owner") !== "player"
+            ) {
+              card = candidate;
+              break;
             }
+          }
+          // 如果記憶中都找不到，亂猜一張還沒翻的
+          if (!card) {
+            const unknown_cards = bot_memory.filter(
+              (m) =>
+                !m.element.hasClass("show_back") &&
+                !m.has_tried &&
+                m.element.data("owner") !== "player"
+            );
+
+            card = unknown_cards.length
+              ? unknown_cards[Math.floor(Math.random() * unknown_cards.length)]
+              : null;
           }
           // 如果這一輪找不到可翻的牌，就跳過這次（例如所有牌都被翻開或已嘗試過）
           if (!card) return;
 
-          // 翻開這張牌
-          card.element.addClass("show_back");
-          // 如果翻對了
-          if (card.true_type === bot_target && !card.element.data("hit")) {
-            // 修正記憶
-            // 分數+1
-            // 翻到三張機器人獲勝（結束遊戲）
+          // 翻開這張牌並加上陰影
+          card.element.addClass("show_back bot-flip");
+          // 如果翻對了且不是玩家先翻過的
+          if (
+            card.true_type === bot_target &&
+            card.element.data("owner") !== "player"
+          ) {
             card.memory_type = card.true_type;
             card.has_tried = true;
-            card.element.data("hit", true);
+            card.element.data("hit", true).data("owner", "bot");
             bot_hits++;
             if (bot_hits === 3) {
               end_game("bot");
               clearInterval(bot_play_game);
             }
           } else {
-            // 翻錯
-            // 修正記憶
-            // 把牌蓋回去
+            // 翻錯或被玩家翻走
             card.memory_type = card.true_type;
             card.has_tried = true;
-
-            setTimeout(() => card.element.removeClass("show_back"), 800);
+            setTimeout(() => card.element.removeClass("show_back bot-flip"), 800);
           }
         }
 
