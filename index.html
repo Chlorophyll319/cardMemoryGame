@@ -66,12 +66,6 @@
         object-fit: cover;
         border-radius: 8px;
       }
-      .player {
-        outline: darkblue solid 4px;
-      }
-      .playboter {
-        outline: tan solid 4px;
-      }
     </style>
   </head>
   <body>
@@ -248,8 +242,12 @@
               end_game("player");
             }
           } else {
-            // 翻 → 錯 → 蓋回去
-            setTimeout(() => $(this).removeClass("show_back"), 800);
+            // 翻 → 錯 → 蓋回去（記下關閉計時器）
+            const hideTimeout = setTimeout(() => {
+              $(this).removeClass("show_back");
+              $(this).removeData("hideTimeout");
+            }, 800);
+            $(this).data("hideTimeout", hideTimeout);
           }
           // 玩家翻牌後 → 如果是機器人要找的牌，記下來下次優先翻
           bot_memory.forEach((m) => {
@@ -282,6 +280,8 @@
           let card;
           // 如果上一輪有記下指定的牌就優先翻
           if (bot_next_target) {
+            // 如果目標牌目前還是開著，就等待下回合
+            if (bot_next_target.element.hasClass("show_back")) return;
             card = bot_next_target;
             // 清除目標
             bot_next_target = null;
@@ -322,6 +322,12 @@
 
           // 翻開這張牌
           card.element.addClass("show_back");
+          // 取消可能存在的關閉計時器
+          const pendingHide = card.element.data("hideTimeout");
+          if (pendingHide) {
+            clearTimeout(pendingHide);
+            card.element.removeData("hideTimeout");
+          }
           // 如果翻對了
           if (card.true_type === bot_target && !card.element.data("hit")) {
             // 修正記憶
@@ -342,7 +348,11 @@
             card.memory_type = card.true_type;
             card.has_tried = true;
 
-            setTimeout(() => card.element.removeClass("show_back"), 800);
+            const hideTimeout = setTimeout(() => {
+              card.element.removeClass("show_back");
+              card.element.removeData("hideTimeout");
+            }, 800);
+            card.element.data("hideTimeout", hideTimeout);
           }
         }
 
